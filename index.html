@@ -33,6 +33,7 @@
 
         body {
             font-family: 'Courier New', monospace;
+            /* WALLPAPER: Replace the URL below with your GitHub-hosted image */
             background: #000 url('https://github.com/Greyismyname/JSONEditor/blob/main/BIRDHOUSEBLACKANDWHITE.png?raw=true') center/cover fixed;
             min-height: 100vh;
             padding: 20px;
@@ -209,6 +210,7 @@
         .info-value {
             color: #e0e0e0;
             position: relative;
+            user-select: none;
         }
 
         .info-value.truncated {
@@ -230,6 +232,14 @@
         }
 
         .info-value.expanded:hover {
+            color: #fff;
+        }
+
+        .info-value:not(.truncated):not(.expanded) {
+            cursor: pointer;
+        }
+
+        .info-value:not(.truncated):not(.expanded):hover {
             color: #fff;
         }
 
@@ -407,6 +417,7 @@
                     <div class="controls-left">
                         <label style="color: #888; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">Group by:</label>
                         <select id="groupBySelect" style="min-width: 150px;">
+                            <option value="uncategorized" selected>uncategorized</option>
                             <option value="level">level</option>
                             <option value="discipline">discipline</option>
                         </select>
@@ -470,9 +481,10 @@
     <script>
         // State
         let jsonData = null;
-        let categoryField = 'level';
+        let categoryField = 'uncategorized';
         let fieldSuggestions = {};
         let editingIndex = null;
+        let expandedCategories = {};
 
         // DOM Elements
         const uploadSection = document.getElementById('uploadSection');
@@ -551,6 +563,7 @@
         // Group By Change
         groupBySelect.addEventListener('change', (e) => {
             categoryField = e.target.value;
+            expandedCategories = {}; // Reset expanded state when changing grouping
             renderCategories();
             updateStats();
         });
@@ -631,6 +644,17 @@
 
         function groupByCategory(data, field) {
             const grouped = {};
+            
+            // If uncategorized, put everything in one group
+            if (field === 'uncategorized') {
+                grouped['All Items'] = data.map((item, index) => ({
+                    ...item,
+                    _originalIndex: index
+                }));
+                return grouped;
+            }
+            
+            // Otherwise group by the specified field
             data.forEach((item, index) => {
                 const category = item[field] || 'Uncategorized';
                 if (!grouped[category]) {
@@ -648,18 +672,20 @@
 
             categoriesContainer.innerHTML = categories.map(category => {
                 const items = groupedData[category];
+                const isExpanded = expandedCategories[category] !== undefined ? expandedCategories[category] : false;
+                
                 return `
                     <div class="category-section">
                         <div class="category-header" onclick="toggleCategory(this)">
                             <div style="display: flex; align-items: center; gap: 15px;">
-                                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="chevron ${isExpanded ? 'rotated' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                 </svg>
                                 <h2>${category}</h2>
                                 <span style="color: #888; font-size: 0.9em;">(${items.length})</span>
                             </div>
                         </div>
-                        <div class="category-content">
+                        <div class="category-content ${isExpanded ? 'expanded' : ''}">
                             ${items.map(item => renderItem(item)).join('')}
                         </div>
                     </div>
@@ -686,13 +712,13 @@
                             </div>
                         `).join('')}
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
-                            <button class="btn btn-primary" onclick="saveEdit(${index}); event.stopPropagation();">
+                            <button class="btn btn-primary" onclick="saveEdit(${index}, event)">
                                 <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                 </svg>
                                 Save
                             </button>
-                            <button class="btn" onclick="cancelEdit(); event.stopPropagation();">
+                            <button class="btn" onclick="cancelEdit(event)">
                                 <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
@@ -717,6 +743,7 @@
                                     <div class="info-label">${key}</div>
                                     <div class="info-value ${isTruncated ? 'truncated' : ''}" 
                                          onclick="toggleFieldValue(this)"
+                                         ondblclick="startEditFromField(${index}, event)"
                                          data-full="${escapedFull}"
                                          data-short="${escapedShort}">
                                         ${escapeHtml(displayValue)}
@@ -725,7 +752,7 @@
                             `;
                         }).join('')}
                     </div>
-                    <button class="btn" onclick="startEdit(${index}); event.stopPropagation();" style="font-size: 0.9em; margin-top: 15px;">
+                    <button class="btn" onclick="startEdit(${index}, event)" style="font-size: 0.9em; margin-top: 15px;">
                         <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
@@ -766,8 +793,13 @@
         function toggleCategory(header) {
             const content = header.nextElementSibling;
             const chevron = header.querySelector('.chevron');
+            const categoryName = header.querySelector('h2').textContent;
+            
             content.classList.toggle('expanded');
             chevron.classList.toggle('rotated');
+            
+            // Track the state
+            expandedCategories[categoryName] = content.classList.contains('expanded');
         }
 
         function toggleFieldValue(element) {
@@ -795,18 +827,27 @@
             return div.innerHTML;
         }
 
-        function startEdit(index) {
+        function startEdit(index, evt) {
+            evt.stopPropagation();
             editingIndex = index;
             renderCategories();
         }
 
-        function cancelEdit() {
+        function startEditFromField(index, evt) {
+            evt.stopPropagation();
+            editingIndex = index;
+            renderCategories();
+        }
+
+        function cancelEdit(evt) {
+            evt.stopPropagation();
             editingIndex = null;
             renderCategories();
         }
 
-        function saveEdit(index) {
-            const card = event.target.closest('.item-card');
+        function saveEdit(index, evt) {
+            evt.stopPropagation();
+            const card = evt.target.closest('.item-card');
             const inputs = card.querySelectorAll('input[data-field]');
             const updatedItem = {};
             
@@ -814,10 +855,18 @@
                 updatedItem[input.dataset.field] = input.value;
             });
 
+            // Update the actual data
             jsonData[index] = updatedItem;
+            
+            // Regenerate suggestions with new data
             fieldSuggestions = extractSuggestions(jsonData);
+            
+            // Clear editing state
             editingIndex = null;
+            
+            // Re-render (this will preserve expanded categories now)
             renderCategories();
+            updateStats();
         }
 
         function updateStats() {
