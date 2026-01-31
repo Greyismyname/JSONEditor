@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Hide scrollbar for all elements */
+        * {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        *::-webkit-scrollbar {
+            display: none;
+        }
+
+        html {
+            overflow-y: scroll;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        html::-webkit-scrollbar {
+            display: none;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            /* WALLPAPER: Replace the URL below with your GitHub-hosted image */
+            background: #000 url('YOUR_GITHUB_WALLPAPER_URL_HERE') center/cover fixed;
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+            position: relative;
+            overflow-y: scroll;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        body::-webkit-scrollbar {
+            display: none;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            letter-spacing: 3px;
+        }
+
+        input, select, textarea, button {
+            font-family: 'Courier New', monospace;
+        }
+
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 12px 20px;
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid #444;
+            color: #e0e0e0;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        input[type="text"]::placeholder, textarea::placeholder {
+            color: #666;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: rgba(40, 40, 40, 0.9);
+            border: 2px solid #555;
+            color: #e0e0e0;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #000;
+            border-color: #fff;
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: rgba(0, 0, 0, 0.9);
+            border-color: #fff;
+        }
+
+        .card {
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #fff;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .upload-zone {
+            border: 3px dashed #444;
+            padding: 60px 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .upload-zone.drag-active {
+            border-color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 20px;
+            stroke: #fff;
+        }
+
+        .category-section {
+            background: #1a1a1a;
+            border: 2px solid #555;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .category-section:hover {
+            border-color: #fff;
+        }
+
+        .category-header {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+
+        .category-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .category-header h2 {
+            color: #fff;
+            font-size: 1.4em;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .category-content {
+            padding: 20px;
+            display: none;
+        }
+
+        .category-content.expanded {
+            display: block;
+        }
+
+        .item-card {
+            background: #0d0d0d;
+            border: 2px solid #333;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 15px;
+            border-left: 3px solid #555;
+        }
+
+        .info-label {
+            font-size: 0.8em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            color: #e0e0e0;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .controls-left {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex: 1;
+        }
+
+        .controls-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            stroke: #888;
+        }
+
+        .search-input {
+            padding-left: 45px;
+        }
+
+        .error-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #fff;
+            color: #fff;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .chevron {
+            width: 24px;
+            height: 24px;
+            stroke: #fff;
+            transition: transform 0.3s;
+        }
+
+        .chevron.rotated {
+            transform: rotate(90deg);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .controls-left {
+                flex-direction: column;
+            }
+
+            .search-wrapper {
+                max-width: 100%;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON Editor</h1>
+
+        <!-- Upload Section -->
+        <div id="uploadSection" class="card">
+            <div id="uploadZone" class="upload-zone">
+                <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p style="font-size: 1.2em; color: #e0e0e0; margin-bottom: 10px;">
+                    Drag & drop JSON file here
+                </p>
+                <p style="color: #888; font-size: 0.95em;">or</p>
+                <label class="btn" style="margin-top: 20px; cursor: pointer;">
+                    <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    Browse Files
+                    <input type="file" id="fileInput" style="display: none;" accept=".json">
+                </label>
+            </div>
+
+            <div style="text-align: center; color: #888; margin: 30px 0; font-style: italic;">
+                or paste JSON below
+            </div>
+
+            <textarea id="jsonTextarea" placeholder="Paste your JSON here..." style="height: 300px; font-family: monospace; font-size: 0.95em; resize: vertical;"></textarea>
+
+            <div id="errorBox" class="error-box hidden"></div>
+
+            <button id="loadBtn" class="btn btn-primary" style="margin-top: 20px; width: 100%; justify-content: center;">
+                Load JSON
+            </button>
+        </div>
+
+        <!-- Editor Section -->
+        <div id="editorSection" class="hidden">
+            <div class="card">
+                <div class="controls">
+                    <div class="controls-left">
+                        <label style="color: #888; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">Group by:</label>
+                        <select id="groupBySelect" style="min-width: 150px;">
+                            <option value="level">level</option>
+                            <option value="discipline">discipline</option>
+                        </select>
+                        <span id="statsText" style="color: #888; font-size: 0.9em;"></span>
+                    </div>
+
+                    <div class="controls-right">
+                        <button id="addNewBtn" class="btn">
+                            <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Add New
+                        </button>
+                        <button id="exportBtn" class="btn">
+                            <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Export
+                        </button>
+                        <button id="newJsonBtn" class="btn">
+                            New JSON
+                        </button>
+                    </div>
+                </div>
+
+                <div class="search-wrapper">
+                    <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search...">
+                </div>
+            </div>
+
+            <!-- Add New Form -->
+            <div id="addNewForm" class="card hidden">
+                <h2 style="color: #fff; font-size: 1.5em; margin-bottom: 25px; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 10px;">
+                    Add New Item
+                </h2>
+                <div id="addNewFields"></div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button id="saveNewBtn" class="btn btn-primary">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Add Item
+                    </button>
+                    <button id="cancelNewBtn" class="btn">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Categories Container -->
+            <div id="categoriesContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let jsonData = null;
+        let categoryField = 'level';
+        let fieldSuggestions = {};
+        let editingIndex = null;
+
+        // DOM Elements
+        const uploadSection = document.getElementById('uploadSection');
+        const editorSection = document.getElementById('editorSection');
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const jsonTextarea = document.getElementById('jsonTextarea');
+        const errorBox = document.getElementById('errorBox');
+        const loadBtn = document.getElementById('loadBtn');
+        const groupBySelect = document.getElementById('groupBySelect');
+        const searchInput = document.getElementById('searchInput');
+        const addNewBtn = document.getElementById('addNewBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const newJsonBtn = document.getElementById('newJsonBtn');
+        const addNewForm = document.getElementById('addNewForm');
+        const categoriesContainer = document.getElementById('categoriesContainer');
+        const statsText = document.getElementById('statsText');
+
+        // Drag and Drop
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('drag-active');
+        });
+
+        uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-active');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-active');
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/json') {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    jsonTextarea.value = event.target.result;
+                };
+                reader.readAsText(file);
+            } else {
+                showError('Please drop a valid JSON file');
+            }
+        });
+
+        // File Input
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    jsonTextarea.value = event.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Load JSON
+        loadBtn.addEventListener('click', () => {
+            try {
+                jsonData = JSON.parse(jsonTextarea.value);
+                if (!Array.isArray(jsonData)) {
+                    throw new Error('JSON must be an array');
+                }
+                fieldSuggestions = extractSuggestions(jsonData);
+                hideError();
+                uploadSection.classList.add('hidden');
+                editorSection.classList.remove('hidden');
+                renderCategories();
+                updateStats();
+            } catch (e) {
+                showError('Invalid JSON: ' + e.message);
+            }
+        });
+
+        // Group By Change
+        groupBySelect.addEventListener('change', (e) => {
+            categoryField = e.target.value;
+            renderCategories();
+            updateStats();
+        });
+
+        // Search
+        searchInput.addEventListener('input', () => {
+            renderCategories();
+        });
+
+        // Add New
+        addNewBtn.addEventListener('click', () => {
+            addNewForm.classList.remove('hidden');
+            renderAddNewForm();
+        });
+
+        document.getElementById('cancelNewBtn').addEventListener('click', () => {
+            addNewForm.classList.add('hidden');
+        });
+
+        document.getElementById('saveNewBtn').addEventListener('click', () => {
+            const newItem = {};
+            const fields = addNewForm.querySelectorAll('input[data-field]');
+            fields.forEach(input => {
+                newItem[input.dataset.field] = input.value;
+            });
+            jsonData.push(newItem);
+            fieldSuggestions = extractSuggestions(jsonData);
+            addNewForm.classList.add('hidden');
+            renderCategories();
+            updateStats();
+        });
+
+        // Export
+        exportBtn.addEventListener('click', () => {
+            const dataStr = JSON.stringify(jsonData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'edited-data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // New JSON
+        newJsonBtn.addEventListener('click', () => {
+            jsonData = null;
+            jsonTextarea.value = '';
+            searchInput.value = '';
+            editorSection.classList.add('hidden');
+            uploadSection.classList.remove('hidden');
+            hideError();
+        });
+
+        // Helper Functions
+        function extractSuggestions(data) {
+            const suggestions = {};
+            if (!Array.isArray(data) || data.length === 0) return suggestions;
+
+            const fields = Object.keys(data[0]);
+            fields.forEach(field => {
+                const uniqueValues = [...new Set(data.map(item => item[field]).filter(val => val))];
+                suggestions[field] = uniqueValues.sort();
+            });
+            return suggestions;
+        }
+
+        function filterBySearch(data) {
+            const searchTerm = searchInput.value.toLowerCase();
+            if (!searchTerm) return data;
+
+            return data.filter(item => {
+                return Object.values(item).some(value =>
+                    String(value).toLowerCase().includes(searchTerm)
+                );
+            });
+        }
+
+        function groupByCategory(data, field) {
+            const grouped = {};
+            data.forEach((item, index) => {
+                const category = item[field] || 'Uncategorized';
+                if (!grouped[category]) {
+                    grouped[category] = [];
+                }
+                grouped[category].push({ ...item, _originalIndex: index });
+            });
+            return grouped;
+        }
+
+        function renderCategories() {
+            const filteredData = filterBySearch(jsonData);
+            const groupedData = groupByCategory(filteredData, categoryField);
+            const categories = Object.keys(groupedData).sort();
+
+            categoriesContainer.innerHTML = categories.map(category => {
+                const items = groupedData[category];
+                return `
+                    <div class="category-section">
+                        <div class="category-header" onclick="toggleCategory(this)">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                                <h2>${category}</h2>
+                                <span style="color: #888; font-size: 0.9em;">(${items.length})</span>
+                            </div>
+                        </div>
+                        <div class="category-content expanded">
+                            ${items.map(item => renderItem(item)).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderItem(item) {
+            const index = item._originalIndex;
+            const fields = Object.entries(item).filter(([key]) => key !== '_originalIndex');
+
+            if (editingIndex === index) {
+                return `
+                    <div class="item-card">
+                        ${fields.map(([key, value]) => `
+                            <div class="form-group">
+                                <label class="form-label">${key}</label>
+                                <input type="text" 
+                                       value="${value}" 
+                                       data-field="${key}" 
+                                       list="edit-suggestions-${key}"
+                                       style="width: 100%;">
+                                ${renderDatalist('edit-suggestions-' + key, key)}
+                            </div>
+                        `).join('')}
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="btn btn-primary" onclick="saveEdit(${index})">
+                                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Save
+                            </button>
+                            <button class="btn" onclick="cancelEdit()">
+                                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="item-card">
+                    <div class="info-grid">
+                        ${fields.map(([key, value]) => `
+                            <div class="info-item">
+                                <div class="info-label">${key}</div>
+                                <div class="info-value">${value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn" onclick="startEdit(${index})" style="font-size: 0.9em;">
+                        <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        Edit
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderDatalist(id, field) {
+            if (!fieldSuggestions[field] || fieldSuggestions[field].length === 0) return '';
+            return `
+                <datalist id="${id}">
+                    ${fieldSuggestions[field].map(suggestion => 
+                        `<option value="${suggestion}">`
+                    ).join('')}
+                </datalist>
+            `;
+        }
+
+        function renderAddNewForm() {
+            if (!jsonData || jsonData.length === 0) return;
+            const fields = Object.keys(jsonData[0]);
+            
+            document.getElementById('addNewFields').innerHTML = fields.map(field => `
+                <div class="form-group">
+                    <label class="form-label">${field}</label>
+                    <input type="text" 
+                           data-field="${field}" 
+                           list="new-suggestions-${field}"
+                           placeholder="${fieldSuggestions[field] ? 'e.g., ' + fieldSuggestions[field][0] : ''}"
+                           style="width: 100%;">
+                    ${renderDatalist('new-suggestions-' + field, field)}
+                </div>
+            `).join('');
+        }
+
+        function toggleCategory(header) {
+            const content = header.nextElementSibling;
+            const chevron = header.querySelector('.chevron');
+            content.classList.toggle('expanded');
+            chevron.classList.toggle('rotated');
+        }
+
+        function startEdit(index) {
+            editingIndex = index;
+            renderCategories();
+        }
+
+        function cancelEdit() {
+            editingIndex = null;
+            renderCategories();
+        }
+
+        function saveEdit(index) {
+            const card = event.target.closest('.item-card');
+            const inputs = card.querySelectorAll('input[data-field]');
+            const updatedItem = {};
+            
+            inputs.forEach(input => {
+                updatedItem[input.dataset.field] = input.value;
+            });
+
+            jsonData[index] = updatedItem;
+            fieldSuggestions = extractSuggestions(jsonData);
+            editingIndex = null;
+            renderCategories();
+        }
+
+        function updateStats() {
+            const filteredData = filterBySearch(jsonData);
+            const groupedData = groupByCategory(filteredData, categoryField);
+            const categoryCount = Object.keys(groupedData).length;
+            statsText.textContent = `(${categoryCount} categories, ${jsonData.length} items)`;
+        }
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorBox.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
