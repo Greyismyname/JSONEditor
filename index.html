@@ -549,6 +549,13 @@
                 if (!Array.isArray(jsonData)) {
                     throw new Error('JSON must be an array');
                 }
+                
+                // Add permanent _originalIndex to each item
+                jsonData = jsonData.map((item, index) => ({
+                    ...item,
+                    _originalIndex: index
+                }));
+                
                 fieldSuggestions = extractSuggestions(jsonData);
                 hideError();
                 uploadSection.classList.add('hidden');
@@ -589,6 +596,10 @@
             fields.forEach(input => {
                 newItem[input.dataset.field] = input.value;
             });
+            
+            // Add _originalIndex for the new item
+            newItem._originalIndex = jsonData.length;
+            
             jsonData.push(newItem);
             fieldSuggestions = extractSuggestions(jsonData);
             addNewForm.classList.add('hidden');
@@ -598,7 +609,12 @@
 
         // Export
         exportBtn.addEventListener('click', () => {
-            const dataStr = JSON.stringify(jsonData, null, 2);
+            // Remove _originalIndex before exporting
+            const exportData = jsonData.map(item => {
+                const { _originalIndex, ...rest } = item;
+                return rest;
+            });
+            const dataStr = JSON.stringify(exportData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -623,7 +639,7 @@
             const suggestions = {};
             if (!Array.isArray(data) || data.length === 0) return suggestions;
 
-            const fields = Object.keys(data[0]);
+            const fields = Object.keys(data[0]).filter(key => key !== '_originalIndex');
             fields.forEach(field => {
                 const uniqueValues = [...new Set(data.map(item => item[field]).filter(val => val))];
                 suggestions[field] = uniqueValues.sort();
@@ -647,20 +663,17 @@
             
             // If uncategorized, put everything in one group
             if (field === 'uncategorized') {
-                grouped['All Items'] = data.map((item, index) => ({
-                    ...item,
-                    _originalIndex: index
-                }));
+                grouped['All Items'] = data.map(item => ({ ...item }));
                 return grouped;
             }
             
             // Otherwise group by the specified field
-            data.forEach((item, index) => {
+            data.forEach((item) => {
                 const category = item[field] || 'Uncategorized';
                 if (!grouped[category]) {
                     grouped[category] = [];
                 }
-                grouped[category].push({ ...item, _originalIndex: index });
+                grouped[category].push({ ...item });
             });
             return grouped;
         }
@@ -775,7 +788,7 @@
 
         function renderAddNewForm() {
             if (!jsonData || jsonData.length === 0) return;
-            const fields = Object.keys(jsonData[0]);
+            const fields = Object.keys(jsonData[0]).filter(key => key !== '_originalIndex');
             
             document.getElementById('addNewFields').innerHTML = fields.map(field => `
                 <div class="form-group">
@@ -849,13 +862,13 @@
             evt.stopPropagation();
             const card = evt.target.closest('.item-card');
             const inputs = card.querySelectorAll('input[data-field]');
-            const updatedItem = {};
+            const updatedItem = { _originalIndex: index };
             
             inputs.forEach(input => {
                 updatedItem[input.dataset.field] = input.value;
             });
 
-            // Update the actual data
+            // Update the actual data at the original index
             jsonData[index] = updatedItem;
             
             // Regenerate suggestions with new data
