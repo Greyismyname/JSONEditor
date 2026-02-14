@@ -418,8 +418,6 @@
                         <label style="color: #888; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">Group by:</label>
                         <select id="groupBySelect" style="min-width: 150px;">
                             <option value="uncategorized" selected>uncategorized</option>
-                            <option value="level">level</option>
-                            <option value="discipline">discipline</option>
                         </select>
                         <span id="statsText" style="color: #888; font-size: 0.9em;"></span>
                     </div>
@@ -556,6 +554,13 @@
                     _originalIndex: index
                 }));
                 
+                // Populate group by dropdown with fields from the JSON
+                const fields = Object.keys(jsonData[0]).filter(key => key !== '_originalIndex');
+                groupBySelect.innerHTML = '<option value="uncategorized">uncategorized</option>' +
+                    fields.map(field => `<option value="${field}">${field}</option>`).join('');
+                categoryField = 'uncategorized';
+                groupBySelect.value = 'uncategorized';
+                
                 fieldSuggestions = extractSuggestions(jsonData);
                 hideError();
                 uploadSection.classList.add('hidden');
@@ -629,6 +634,9 @@
             jsonData = null;
             jsonTextarea.value = '';
             searchInput.value = '';
+            categoryField = 'uncategorized';
+            expandedCategories = {};
+            groupBySelect.innerHTML = '<option value="uncategorized">uncategorized</option>';
             editorSection.classList.add('hidden');
             uploadSection.classList.remove('hidden');
             hideError();
