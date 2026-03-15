@@ -97,6 +97,11 @@
         input[type="text"]::placeholder, textarea::placeholder {
             color: #666;
         }
+        
+        textarea {
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+        }
 
         .btn {
             padding: 12px 30px;
@@ -597,9 +602,19 @@
 
         document.getElementById('saveNewBtn').addEventListener('click', () => {
             const newItem = {};
-            const fields = addNewForm.querySelectorAll('input[data-field]');
-            fields.forEach(input => {
-                newItem[input.dataset.field] = input.value;
+            const textareas = addNewForm.querySelectorAll('textarea[data-field]');
+            textareas.forEach(textarea => {
+                const fieldName = textarea.dataset.field;
+                let value = textarea.value;
+                
+                // Try to parse as JSON (for arrays/objects)
+                try {
+                    const parsed = JSON.parse(value);
+                    newItem[fieldName] = parsed;
+                } catch (e) {
+                    // Not valid JSON, keep as string
+                    newItem[fieldName] = value;
+                }
             });
             
             // Add _originalIndex for the new item
@@ -721,17 +736,19 @@
             if (editingIndex === index) {
                 return `
                     <div class="item-card">
-                        ${fields.map(([key, value]) => `
+                        ${fields.map(([key, value]) => {
+                            const valueStr = Array.isArray(value) ? JSON.stringify(value, null, 2) : String(value);
+                            const rows = Array.isArray(value) ? Math.min(value.length + 2, 10) : (valueStr.length > 100 ? 5 : 3);
+                            
+                            return `
                             <div class="form-group">
                                 <label class="form-label">${key}</label>
-                                <input type="text" 
-                                       value="${String(value).replace(/"/g, '&quot;')}" 
+                                <textarea 
                                        data-field="${key}" 
-                                       list="edit-suggestions-${key}"
-                                       style="width: 100%;">
-                                ${renderDatalist('edit-suggestions-' + key, key)}
+                                       style="width: 100%; min-height: 60px; font-family: 'Courier New', monospace; resize: vertical;"
+                                       rows="${rows}">${valueStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
                             <button class="btn btn-primary" onclick="saveEdit(${index}, event)">
                                 <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -754,11 +771,27 @@
                 <div class="item-card">
                     <div class="info-grid">
                         ${fields.map(([key, value]) => {
-                            const valueStr = String(value);
+                            let displayContent;
+                            let valueStr;
+                            let fullHtml;
+                            
+                            if (Array.isArray(value)) {
+                                // Format arrays as a bulleted list
+                                valueStr = value.join(' • ');
+                                fullHtml = value.map(item => `• ${escapeHtml(item)}`).join('<br>');
+                                displayContent = fullHtml;
+                            } else {
+                                valueStr = String(value);
+                                fullHtml = escapeHtml(valueStr);
+                                displayContent = fullHtml;
+                            }
+                            
                             const isTruncated = valueStr.length > 60;
                             const displayValue = isTruncated ? valueStr.substring(0, 60) + '...' : valueStr;
-                            const escapedFull = valueStr.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                            const escapedShort = displayValue.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                            const escapedFull = valueStr.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, '&#10;');
+                            const escapedShort = displayValue.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, '&#10;');
+                            const escapedFullHtml = fullHtml.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                            
                             return `
                                 <div class="info-item">
                                     <div class="info-label">${key}</div>
@@ -766,8 +799,10 @@
                                          onclick="toggleFieldValue(this)"
                                          ondblclick="startEditFromField(${index}, event)"
                                          data-full="${escapedFull}"
-                                         data-short="${escapedShort}">
-                                        ${escapeHtml(displayValue)}
+                                         data-short="${escapedShort}"
+                                         data-full-html="${escapedFullHtml}"
+                                         data-is-array="${Array.isArray(value)}">
+                                        ${isTruncated ? escapeHtml(displayValue) : displayContent}
                                     </div>
                                 </div>
                             `;
@@ -798,17 +833,22 @@
             if (!jsonData || jsonData.length === 0) return;
             const fields = Object.keys(jsonData[0]).filter(key => key !== '_originalIndex');
             
-            document.getElementById('addNewFields').innerHTML = fields.map(field => `
+            document.getElementById('addNewFields').innerHTML = fields.map(field => {
+                // Check if this field is typically an array in the data
+                const sampleValue = jsonData[0][field];
+                const isArray = Array.isArray(sampleValue);
+                const placeholder = fieldSuggestions[field] ? 'e.g., ' + fieldSuggestions[field][0] : (isArray ? '["item1", "item2"]' : '');
+                
+                return `
                 <div class="form-group">
                     <label class="form-label">${field}</label>
-                    <input type="text" 
+                    <textarea 
                            data-field="${field}" 
-                           list="new-suggestions-${field}"
-                           placeholder="${fieldSuggestions[field] ? 'e.g., ' + fieldSuggestions[field][0] : ''}"
-                           style="width: 100%;">
-                    ${renderDatalist('new-suggestions-' + field, field)}
+                           placeholder="${placeholder}"
+                           style="width: 100%; min-height: ${isArray ? '100px' : '60px'}; font-family: 'Courier New', monospace; resize: vertical;"
+                           rows="${isArray ? 4 : 2}"></textarea>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function toggleCategory(header) {
@@ -828,10 +868,19 @@
                 element.classList.remove('truncated');
                 element.classList.add('expanded');
                 const fullText = element.getAttribute('data-full');
-                // Create temp div to decode HTML entities
-                const temp = document.createElement('div');
-                temp.innerHTML = fullText;
-                element.textContent = temp.textContent;
+                const isArray = element.getAttribute('data-is-array') === 'true';
+                
+                if (isArray) {
+                    // Use the formatted HTML for arrays
+                    const temp = document.createElement('div');
+                    temp.innerHTML = element.getAttribute('data-full-html');
+                    element.innerHTML = temp.innerHTML;
+                } else {
+                    // Decode HTML entities for regular text
+                    const temp = document.createElement('div');
+                    temp.innerHTML = fullText;
+                    element.textContent = temp.textContent;
+                }
             } else if (element.classList.contains('expanded')) {
                 element.classList.add('truncated');
                 element.classList.remove('expanded');
@@ -869,11 +918,21 @@
         function saveEdit(index, evt) {
             evt.stopPropagation();
             const card = evt.target.closest('.item-card');
-            const inputs = card.querySelectorAll('input[data-field]');
+            const textareas = card.querySelectorAll('textarea[data-field]');
             const updatedItem = { _originalIndex: index };
             
-            inputs.forEach(input => {
-                updatedItem[input.dataset.field] = input.value;
+            textareas.forEach(textarea => {
+                const fieldName = textarea.dataset.field;
+                let value = textarea.value;
+                
+                // Try to parse as JSON (for arrays)
+                try {
+                    const parsed = JSON.parse(value);
+                    updatedItem[fieldName] = parsed;
+                } catch (e) {
+                    // Not valid JSON, keep as string
+                    updatedItem[fieldName] = value;
+                }
             });
 
             // Update the actual data at the original index
